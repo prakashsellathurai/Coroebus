@@ -1,0 +1,3 @@
+[submodule "activities"]
+	path = activities
+	url = https://github.com/prakashsellathurai/strava-data-archive
