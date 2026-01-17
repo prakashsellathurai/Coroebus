@@ -2,7 +2,9 @@ from shiny import App, ui, render, reactive
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 from pathlib import Path
+import plotly.express as px
 from shinywidgets import output_widget, render_widget
 
 # Load data
@@ -11,19 +13,29 @@ df_load = pd.read_csv(csv_path)
 df_load["date"] = pd.to_datetime(df_load["date"])
 
 app_ui = ui.page_fluid(
-    ui.panel_title("Fatigue, Fitness & Training Load Trends"),
+    ui.head_content(
+        ui.tags.style("""
+            body { background-color: #f8f9fa; font-family: 'Inter', -apple-system, sans-serif; }
+            .sidebar { background-color: white !important; border-right: 1px solid #e0e0e0 !important; }
+            .panel-title { font-weight: 700; color: #333; margin-bottom: 20px; }
+            .card { border-radius: 8px; border: 1px solid #e0e0e0; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        """)
+    ),
     ui.layout_sidebar(
         ui.sidebar(
+            ui.div(
+                {"class": "card p-3 mb-3"},
+                ui.output_ui("latest_values")
+            ),
             ui.markdown("""
             **Metrics Guide:**
-            - **Fitness (CTL):** Chronic Training Load (Long-term)
-            - **Fatigue (ATL):** Acute Training Load (Short-term)
-            - **Form (TSB):** Fitness - Fatigue (Readiness)
+            - **Fitness (CTL):** Chronic Training Load
+            - **Fatigue (ATL):** Acute Training Load
+            - **Form (TSB):** Fitness - Fatigue
             """),
-            ui.input_slider("ctl_tc", "Fitness (CTL) Days", 7, 100, 42),
-            ui.input_slider("atl_tc", "Fatigue (ATL) Days", 1, 30, 7),
+            position="right",
+            width=300
         ),
-        
         output_widget("plot"),
     )
 )
@@ -37,8 +49,8 @@ def server(input, output, session):
         # Banister Model: 
         # CTL_now = CTL_prev * e^(-1/CTL_tc) + Load * (1 - e^(-1/CTL_tc))
         
-        ctl_tc = input.ctl_tc()
-        atl_tc = input.atl_tc()
+        ctl_tc = 42  # Fitness (CTL) Days
+        atl_tc = 7   # Fatigue (ATL) Days
         
         ctl = [0.0]
         atl = [0.0]
@@ -56,66 +68,173 @@ def server(input, output, session):
         df["atl"] = atl[1:]
         df["tsb"] = df["ctl"] - df["atl"]
         
+        # 7-day Ramp Rate: CTL(t) - CTL(t-7)
+        df["ramp"] = df["ctl"].diff(7).fillna(0)
+        
         return df
 
     @render_widget
     def plot():
         df = calculate_trends()
         
-        fig = go.Figure()
+        # Create subplots
+        fig = make_subplots(
+            rows=3, cols=1, 
+            shared_xaxes=True, 
+            vertical_spacing=0.08,
+            subplot_titles=("Daily Training Load", "Form (TSB) & PMC", "Ramp Rate (7d)"),
+            row_heights=[0.25, 0.5, 0.25]
+        )
         
-        # Load as bars
-        fig.add_trace(go.Bar(
-            x=df["date"], y=df["load"], 
-            name="Daily Load", 
-            marker_color="rgba(100, 100, 100, 0.3)",
-            yaxis="y2"
-        ))
+        # --- Row 1: Daily Load ---
+        load_fig = px.line(df, x="date", y="load")
+        load_trace = load_fig.data[0]
+        load_trace.name = "Daily Load"
+        load_trace.line = dict(color="rgba(142, 142, 147, 0.6)", width=2)
+        fig.add_trace(load_trace, row=1, col=1)
         
+        # --- Row 2: Form (TSB), Fitness (CTL), Fatigue (ATL) ---
         # Fitness (CTL)
         fig.add_trace(go.Scatter(
             x=df["date"], y=df["ctl"], 
             name="Fitness (CTL)", 
-            line=dict(color="#2ecc71", width=3)
-        ))
+            line=dict(color="rgba(0, 191, 255, 0.6)", width=2.5)
+        ), row=2, col=1)
         
         # Fatigue (ATL)
         fig.add_trace(go.Scatter(
             x=df["date"], y=df["atl"], 
             name="Fatigue (ATL)", 
-            line=dict(color="#e74c3c", width=2, dash="dot")
-        ))
+            line=dict(color="rgba(186, 85, 211, 0.6)", width=1.5)
+        ), row=2, col=1)
         
         # Form (TSB)
         fig.add_trace(go.Scatter(
             x=df["date"], y=df["tsb"], 
             name="Form (TSB)", 
-            fill='tozeroy',
-            line=dict(color="#3498db", width=1)
-        ))
+            line=dict(color="rgba(76, 187, 23, 0.6)", width=2.5)
+        ), row=2, col=1)
 
-        # Add Training Zones
-        # High Risk: Below -30
-        fig.add_hrect(y0=-100, y1=-30, fillcolor="rgba(231, 76, 60, 0.1)", line_width=0, layer="below", annotation_text="High Risk", annotation_position="left")
-        # Optimal: -30 to -10
-        fig.add_hrect(y0=-30, y1=-10, fillcolor="rgba(46, 204, 113, 0.1)", line_width=0, layer="below", annotation_text="Optimal", annotation_position="left")
-        # Others/Neutral/Overload: Above -10
-        fig.add_hrect(y0=-10, y1=100, fillcolor="rgba(149, 165, 166, 0.1)", line_width=0, layer="below", annotation_text="Other", annotation_position="left")
+        # Add Training Zones to Row 2
+        # Risk Zone: Below -30
+        fig.add_hrect(y0=-100, y1=-30, fillcolor="rgba(255, 45, 85, 0.1)", line_width=0, layer="below", annotation_text="Risk", annotation_position="top left", row=2, col=1)
+        # Optimal Zone: -30 to -10
+        fig.add_hrect(y0=-30, y1=-10, fillcolor="rgba(76, 217, 100, 0.1)", line_width=0, layer="below", annotation_text="Optimal", annotation_position="top left", row=2, col=1)
+        # Grey Zone: -10 to 5
+        fig.add_hrect(y0=-10, y1=5, fillcolor="rgba(142, 142, 147, 0.1)", line_width=0, layer="below", row=2, col=1)
+        # Fresh Zone: Above 5
+        fig.add_hrect(y0=5, y1=100, fillcolor="rgba(0, 174, 239, 0.1)", line_width=0, layer="below", annotation_text="Fresh", annotation_position="top left", row=2, col=1)
+
+        # --- Row 3: Ramp Rate ---
+        # Positive ramp (green) - ramping up
+        ramp_positive = df["ramp"].clip(lower=0)
+        fig.add_trace(go.Scatter(
+            x=df["date"], y=ramp_positive, 
+            name="Ramp Up", 
+            line=dict(color="rgba(76, 187, 23, 0.6)", width=2),
+            fill='tozeroy',
+            fillcolor="rgba(76, 187, 23, 0.1)"
+        ), row=3, col=1)
+        
+        # Negative ramp (blue) - ramping down
+        ramp_negative = df["ramp"].clip(upper=0)
+        fig.add_trace(go.Scatter(
+            x=df["date"], y=ramp_negative, 
+            name="Ramp Down", 
+            line=dict(color="rgba(100, 149, 237, 0.6)", width=2),
+            fill='tozeroy',
+            fillcolor="rgba(100, 149, 237, 0.1)"
+        ), row=3, col=1)
         
         fig.update_layout(
             template="plotly_white",
-            height=600,
-            xaxis_title="Date",
-            yaxis_title="Load / Stress Metrics",
-            yaxis2=dict(
-                title="Daily Load",
-                overlaying="y",
-                side="right"
+            height=900,
+            showlegend=True,
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="right",
+                x=1
             ),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            hovermode="x unified"
+            hovermode="x unified",
+            margin=dict(l=60, r=40, t=100, b=60),
+            hoverlabel=dict(
+                bgcolor="white",
+                font_size=12,
+                font_family="Inter"
+            ),
+            legend_traceorder="normal"
+        )
+
+        # Sync axes and add spikelines for "same line" effect across all subplots
+        fig.update_xaxes(
+            showspikes=True,
+            spikemode="across",
+            spikesnap="cursor",
+            spikethickness=1,
+            spikedash="solid",
+            spikecolor="#666"
         )
         
+        fig.update_yaxes(
+            showspikes=True,
+            spikemode="across",
+            spikesnap="cursor",
+            spikethickness=1,
+            spikedash="solid",
+            spikecolor="#666"
+        )
+        
+        # Update axis titles
+        fig.update_yaxes(title_text="Load", row=1, col=1)
+        fig.update_yaxes(title_text="Stress / Balance", row=2, col=1)
+        fig.update_yaxes(title_text="Ramp", row=3, col=1)
+        fig.update_xaxes(title_text="Date", row=3, col=1)
+        
+        # Grid lines
+        fig.update_xaxes(showgrid=True, gridcolor="rgba(235, 235, 235, 1)")
+        fig.update_yaxes(showgrid=True, gridcolor="rgba(235, 235, 235, 1)")
+        
         return fig
+
+    @render.ui
+    def latest_values():
+        df = calculate_trends()
+        last_row = df.iloc[-1]
+        
+        date_str = last_row["date"].strftime("%b %d")
+        fitness = round(last_row["ctl"])
+        fatigue = round(last_row["atl"])
+        form = round(last_row["tsb"])
+        
+        # Determine training zone
+        zone = "Neutral"
+        zone_color = "#999"
+        if form < -30:
+            zone = "Risk"
+            zone_color = "#FF2D55"
+        elif -30 <= form < -10:
+            zone = "Optimal Training Zone"
+            zone_color = "#4CD964"
+        elif form > 5:
+            zone = "Freshness"
+            zone_color = "#00AEEF"
+            
+        return ui.div(
+            ui.h4(date_str, style="margin-top:0; color:#666;"),
+            ui.div(
+                ui.p("Fitness", style="margin-bottom:0; font-size: 0.9em; color: #888;"),
+                ui.h2(str(fitness), style="margin-top:0; color: #00AEEF;"),
+                
+                ui.p("Fatigue", style="margin-bottom:0; font-size: 0.9em; color: #888;"),
+                ui.h2(str(fatigue), style="margin-top:0; color: #FF2D55;"),
+                
+                ui.p("Form", style="margin-bottom:0; font-size: 0.9em; color: #888;"),
+                ui.h2(str(form), style=f"margin-top:0; color: {zone_color};"),
+                
+                ui.p(zone, style=f"font-weight: bold; color: {zone_color}; padding: 5px 10px; border-radius: 4px; background: {zone_color}1a; display: inline-block;")
+            )
+        )
 
 app = App(app_ui, server)
