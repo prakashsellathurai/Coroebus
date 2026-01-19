@@ -1,1 +1,4 @@
-__pycache__/app.cpython-313.pyc
+__pycache__/*
+_site/*
+__pycache__/load_data.cpython-313.pyc
+__pycache__/performance.cpython-313.pyc
