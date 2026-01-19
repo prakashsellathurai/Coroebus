@@ -6,6 +6,7 @@ from plotly.subplots import make_subplots
 from pathlib import Path
 import plotly.express as px
 from shinywidgets import output_widget, render_widget
+from performance import calculate_predictions, get_race_pace_history, get_pace_string
 
 # Load data
 csv_path = Path(__file__).parent / "daily_load.csv"
@@ -25,8 +26,13 @@ app_ui = ui.page_fluid(
         ui.sidebar(
             ui.div(
                 {"class": "card p-3 mb-3"},
-                ui.output_ui("latest_values")
+                ui.output_ui("latest_values"),
+                
             ),
+             
+                 ui.output_ui("performance_metrics"),
+            
+           
             ui.markdown("""
             **Metrics Guide:**
             - **Fitness (CTL):** Chronic Training Load
@@ -36,6 +42,7 @@ app_ui = ui.page_fluid(
             position="right",
             width=300
         ),
+
         output_widget("plot"),
     )
 )
@@ -79,11 +86,11 @@ def server(input, output, session):
         
         # Create subplots
         fig = make_subplots(
-            rows=3, cols=1, 
+            rows=4, cols=1, 
             shared_xaxes=True, 
             vertical_spacing=0.08,
-            subplot_titles=("Daily Training Load", "Form (TSB) & PMC", "Ramp Rate (7d)"),
-            row_heights=[0.25, 0.5, 0.25]
+            subplot_titles=("Daily Training Load", "Form (TSB) & PMC", "Ramp Rate (7d)", "Estimated Race Pace"),
+            row_heights=[0.2, 0.4, 0.2, 0.2]
         )
         
         # --- Row 1: Daily Load ---
@@ -146,6 +153,24 @@ def server(input, output, session):
             fillcolor="rgba(100, 149, 237, 0.1)"
         ), row=3, col=1)
         
+        # --- Row 4: Race Pace ---
+        pace_history = get_race_pace_history()
+        if pace_history:
+            df_pace = pd.DataFrame(pace_history)
+            # Convert m/s to min/km (float minutes) for plotting
+            df_pace["pace_min"] = (1000 / df_pace["speed_mps"]) / 60
+            
+            fig.add_trace(go.Scatter(
+                x=df_pace["date"], y=df_pace["pace_min"],
+                name="Est. Race Pace",
+                mode='lines+markers',
+                line=dict(color="rgba(255, 149, 0, 0.8)", width=2),
+                marker=dict(size=4),
+                hovertemplate="%{y:.2f} min/km<extra></extra>"
+            ), row=4, col=1)
+            
+            fig.update_yaxes(autorange="reversed", row=4, col=1) 
+
         fig.update_layout(
             template="plotly_white",
             height=900,
@@ -190,7 +215,8 @@ def server(input, output, session):
         fig.update_yaxes(title_text="Load", row=1, col=1)
         fig.update_yaxes(title_text="Stress / Balance", row=2, col=1)
         fig.update_yaxes(title_text="Ramp", row=3, col=1)
-        fig.update_xaxes(title_text="Date", row=3, col=1)
+        fig.update_yaxes(title_text="Pace (min/km)", row=4, col=1)
+        fig.update_xaxes(title_text="Date", row=4, col=1)
         
         # Grid lines
         fig.update_xaxes(showgrid=True, gridcolor="rgba(235, 235, 235, 1)")
@@ -234,6 +260,29 @@ def server(input, output, session):
                 ui.h2(str(form), style=f"margin-top:0; color: {zone_color};"),
                 
                 ui.p(zone, style=f"font-weight: bold; color: {zone_color}; padding: 5px 10px; border-radius: 4px; background: {zone_color}1a; display: inline-block;")
+            )
+            )
+
+
+    @render.ui
+    def performance_metrics():
+        preds = calculate_predictions()
+        return ui.div(
+             {"class": "card p-3 mb-3"},
+            ui.h5("Predicted Paces", style="font-weight: 700; margin-bottom: 15px; color: #333;"),
+            ui.div(
+                ui.div(
+                    ui.p("Reference Race Pace", style="margin-bottom:2px; font-size: 0.85em; color: #888; text-transform: uppercase; letter-spacing: 0.5px;"),
+                    ui.h3(preds["race_pace"], style="margin-top:0; margin-bottom: 12px; color: #007AFF; font-weight: 600;"),
+                ),
+                ui.div(
+                    ui.p("Zone 2 (Endurance)", style="margin-bottom:2px; font-size: 0.85em; color: #888; text-transform: uppercase; letter-spacing: 0.5px;"),
+                    ui.h4(preds["zone2_pace"], style="margin-top:0; margin-bottom: 12px; color: #333; font-weight: 500;"),
+                ),
+                ui.div(
+                    ui.p("Easy Run", style="margin-bottom:2px; font-size: 0.85em; color: #888; text-transform: uppercase; letter-spacing: 0.5px;"),
+                    ui.h4(preds["easy_pace"], style="margin-top:0; margin-bottom: 0px; color: #333; font-weight: 500;"),
+                )
             )
         )
 
