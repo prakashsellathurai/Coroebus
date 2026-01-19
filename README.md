@@ -11,9 +11,14 @@ Built with **Shiny for Python**, **Plotly**, and **Pandas**, it provides an inte
   - **Fitness (CTL)**: Chronic Training Load (Long-term trend).
   - **Fatigue (ATL)**: Acute Training Load (Short-term stress).
   - **Form (TSB)**: Fitness minus Fatigue, indicating recovery and readiness.
+  - **Ramp Rate**: 7-day change in Fitness (CTL) to monitor training progression.
+  - **Estimated Race Pace**: Tracks best efforts (>5km) over time.
+- **Pace Predictions**:
+  - Automatically calculates **Zone 2 (Endurance)** and **Easy Run** paces based on recent best performances.
 - **Interactive Visualization**:
+  - **Synchronized Subplots**: Coordinated views for Load, Metrics, Ramp, and Pace.
+  - **Spikelines**: Cross-chart markers for precise date comparison.
   - Zoom, pan, and hover over data points.
-  - Adjust CTL and ATL time constants via sliders to see real-time changes.
 - **Training Zones**:
   - 🔴 **High Risk**: TSB < -30 (High injury risk/overreaching).
   - 🟢 **Optimal**: TSB between -10 and -30 (Sweet spot for fitness gains).
@@ -36,7 +41,7 @@ Coroebus/
 ### Prerequisites
 
 - Python 3.13+
-- [uv](https://github.com/astral-sh/uv) (recommended for package management)
+- [uv](https://github.com/astral-sh/uv)
 
 ### Installation
 
@@ -49,7 +54,10 @@ Coroebus/
 ### Usage
 
 1. **Process Activity Data**:
-   Place your Strava activity JSON files in the `activities/` directory, then run:
+   Ensure the `activities/` directory is populated with Strava activity JSON files. 
+   See [Strava Backup Setup](https://github.com/prakashsellathurai/strava-backup) for instructions on how to configure and sync your activities.
+   
+   Then, run:
    ```bash
    uv run python load_data.py
    ```
