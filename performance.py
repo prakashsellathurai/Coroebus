@@ -174,5 +174,5 @@ def get_race_pace_history():
         
     except Exception as e:
         print(f"Error getting history: {e}")
-        
+    history = [{"date": rec["date"].isoformat(), "speed_mps": rec["speed_mps"]} for rec in history]
     return history
