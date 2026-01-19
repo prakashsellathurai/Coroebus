@@ -6,11 +6,11 @@ from plotly.subplots import make_subplots
 from pathlib import Path
 import plotly.express as px
 from shinywidgets import output_widget, render_widget
+from load_data import get_daily_load
 from performance import calculate_predictions, get_race_pace_history, get_pace_string
 
 # Load data
-csv_path = Path(__file__).parent / "daily_load.csv"
-df_load = pd.read_csv(csv_path)
+df_load = get_daily_load()
 df_load["date"] = pd.to_datetime(df_load["date"])
 
 app_ui = ui.page_fluid(
