@@ -69,19 +69,19 @@ def calculate_predictions():
                     date_dt = datetime.strptime(date_str.replace("Z", ""), "%Y-%m-%dT%H:%M:%S").date()
                     
                     if date_dt < cutoff_date:
-                        print(f"Skipping {file_path.name}: Date {date_dt} < {cutoff_date}")
+                        # print(f"Skipping {file_path.name}: Date {date_dt} < {cutoff_date}")
                         # Keep it commented to avoid spam, but useful if we enable it.
                         pass
                         
                     # Check distance (meters) - strictly > 5000m
                     distance = activity.get("distance", 0)
                     if distance <= 5000:
-                        print(f"Skipping {file_path.name}: Distance {distance} <= 5000")
+                        # print(f"Skipping {file_path.name}: Distance {distance} <= 5000")
                         continue
                         
                     # Check speed
                     avg_speed = activity.get("average_speed", 0)
-                    print(f"Candidate: {file_path.name}, Date: {date_dt}, Dist: {distance}, Speed: {avg_speed}")
+                    # print(f"Candidate: {file_path.name}, Date: {date_dt}, Dist: {distance}, Speed: {avg_speed}")
                     if avg_speed > best_speed_mps:
                         best_speed_mps = avg_speed
                         

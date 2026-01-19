@@ -1,10 +1,11 @@
 import json
 import os
 import pandas as pd
+from pathlib import Path
 from datetime import datetime
 
 # Path to activities
-ACTIVITIES_DIR = r"./activities"
+ACTIVITIES_DIR = Path(__file__).parent / "activities" / "activities"
 
 def calculate_load(activity):
     """
@@ -30,7 +31,7 @@ def calculate_load(activity):
         
     return load
 
-def main():
+def get_daily_load():
     data = []
     
     if not os.path.exists(ACTIVITIES_DIR):
@@ -79,9 +80,7 @@ def main():
     daily_load = daily_load.set_index("date").reindex(all_dates, fill_value=0).reset_index()
     daily_load.columns = ["date", "load"]
     
-    output_path = "daily_load.csv"
-    daily_load.to_csv(output_path, index=False)
-    print(f"Saved aggregated load data to {output_path}")
+    return daily_load
 
 if __name__ == "__main__":
     main()
